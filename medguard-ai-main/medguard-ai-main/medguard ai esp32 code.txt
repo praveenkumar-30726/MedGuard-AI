@@ -1,0 +1,491 @@
+```cpp
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+#include <math.h>
+
+#include <DHT.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_ADXL345_U.h>
+#include <MAX30105.h>
+#include "spo2_algorithm.h"
+#include <LiquidCrystal_I2C.h>
+
+// ============== WIFI AND THINGSPEAK ==============
+const char* WIFI_SSID = "Airtel_KNV_Home";
+const char* WIFI_PASSWORD = "Sksm@558";
+const char* THINGSPEAK_API_KEY = "9D7E23U9WE5VI76S";
+
+// ============== SENSOR PINS ==============
+#define DHT_PIN 4
+#define DHT_TYPE DHT11
+
+// I2C connections:
+// SDA = GPIO 21
+// SCL = GPIO 22
+
+// ============== OBJECTS ==============
+DHT dht(DHT_PIN, DHT_TYPE);
+Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
+MAX30105 particleSensor;
+
+// I2C LCD: address 0x27, 16 columns, 2 rows
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ============== TIMERS ==============
+unsigned long lastSensorRead = 0;
+unsigned long lastUpload = 0;
+
+const unsigned long SENSOR_INTERVAL = 5000;
+const unsigned long UPLOAD_INTERVAL = 20000;
+
+// ============== THINGSPEAK SEQUENCE ==============
+unsigned long sequenceNumber = 0;
+
+// ============== SENSOR DATA ==============
+float heartRate = 0;
+float spo2 = 0;
+float temperature = 0;
+float humidity = 0;
+float tiltAngle = 0;
+
+bool maxSensorOK = false;
+bool accelSensorOK = false;
+bool dhtSensorOK = false;
+
+int healthStatus = 1;
+int securityStatus = 0;
+int sensorQuality = 1;
+int networkStatus = 1;
+
+// ============== MAX30102 BUFFERS ==============
+const int BUFFER_LENGTH = 100;
+
+uint32_t irBuffer[BUFFER_LENGTH];
+uint32_t redBuffer[BUFFER_LENGTH];
+
+// ============== LCD DISPLAY ==============
+void updateLCD() {
+  char line1[17];
+  char line2[17];
+
+  // First line: heart rate and SpO2
+  if (maxSensorOK) {
+    snprintf(
+      line1,
+      sizeof(line1),
+      "HR:%.0f O2:%.0f%%",
+      heartRate,
+      spo2
+    );
+  } else {
+    snprintf(line1, sizeof(line1), "HR:-- O2:--%%");
+  }
+
+  // Second line: temperature and health status
+  if (dhtSensorOK) {
+    snprintf(
+      line2,
+      sizeof(line2),
+      "T:%.1fC %s",
+      temperature,
+      healthStatus == 0 ? "NORMAL" : "CHECK"
+    );
+  } else {
+    snprintf(
+      line2,
+      sizeof(line2),
+      "Temp:-- %s",
+      healthStatus == 0 ? "NORMAL" : "CHECK"
+    );
+  }
+
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print(line1);
+
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+  lcd.print(line2);
+}
+
+// ============== MAX30102 READING ==============
+void readMAX30102() {
+  heartRate = 0;
+  spo2 = 0;
+  maxSensorOK = false;
+
+  // Use the already initialized sensor.
+  for (int i = 0; i < BUFFER_LENGTH; i++) {
+    unsigned long waitStart = millis();
+
+    while (!particleSensor.available()) {
+      particleSensor.check();
+
+      if (millis() - waitStart > 2000) {
+        Serial.println("MAX30102: Sample timeout.");
+        return;
+      }
+
+      delay(1);
+    }
+
+    redBuffer[i] = particleSensor.getRed();
+    irBuffer[i] = particleSensor.getIR();
+
+    particleSensor.nextSample();
+  }
+
+  int32_t calculatedSpO2 = 0;
+  int8_t validSpO2 = 0;
+  int32_t calculatedHeartRate = 0;
+  int8_t validHeartRate = 0;
+
+  maxim_heart_rate_and_oxygen_saturation(
+    irBuffer,
+    BUFFER_LENGTH,
+    redBuffer,
+    &calculatedSpO2,
+    &validSpO2,
+    &calculatedHeartRate,
+    &validHeartRate
+  );
+
+  uint64_t irTotal = 0;
+
+  for (int i = 0; i < BUFFER_LENGTH; i++) {
+    irTotal += irBuffer[i];
+  }
+
+  uint32_t averageIR = irTotal / BUFFER_LENGTH;
+
+  if (
+    averageIR > 50000 &&
+    validHeartRate &&
+    validSpO2 &&
+    calculatedHeartRate >= 30 &&
+    calculatedHeartRate <= 220 &&
+    calculatedSpO2 >= 70 &&
+    calculatedSpO2 <= 100
+  ) {
+    heartRate = calculatedHeartRate;
+    spo2 = calculatedSpO2;
+    maxSensorOK = true;
+  } else {
+    Serial.println(
+      "MAX30102: Invalid reading. Check finger placement."
+    );
+  }
+}
+
+// ============== ADXL345 READING ==============
+void readADXL345() {
+  accelSensorOK = false;
+
+  sensors_event_t event;
+  accel.getEvent(&event);
+
+  float x = event.acceleration.x;
+  float y = event.acceleration.y;
+  float z = event.acceleration.z;
+
+  tiltAngle =
+    atan2(sqrt(x * x + y * y), z) * 180.0 / PI;
+
+  accelSensorOK = true;
+}
+
+// ============== DHT11 READING ==============
+void readDHT11() {
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+
+  dhtSensorOK =
+    !isnan(temperature) && !isnan(humidity);
+
+  if (!dhtSensorOK) {
+    temperature = 0;
+    humidity = 0;
+
+    Serial.println("DHT11 reading failed.");
+  }
+}
+
+// ============== HEALTH STATUS ==============
+void updateHealthStatus() {
+  // Demonstration thresholds only.
+  // These are not medical diagnostic thresholds.
+
+  if (!maxSensorOK) {
+    healthStatus = 1;
+  } else if (
+    heartRate < 50 ||
+    heartRate > 120 ||
+    spo2 < 92
+  ) {
+    healthStatus = 1;
+  } else {
+    healthStatus = 0;
+  }
+}
+
+// ============== SENSOR QUALITY ==============
+void updateSensorQuality() {
+  if (maxSensorOK && accelSensorOK && dhtSensorOK) {
+    sensorQuality = 0;
+  } else {
+    sensorQuality = 1;
+  }
+}
+
+// ============== SERIAL MONITOR ==============
+void printReadings() {
+  Serial.println("\n========== HEALTH MONITOR ==========");
+
+  if (maxSensorOK) {
+    Serial.print("Heart Rate: ");
+    Serial.print(heartRate);
+    Serial.println(" BPM");
+
+    Serial.print("SpO2: ");
+    Serial.print(spo2);
+    Serial.println(" %");
+  } else {
+    Serial.println("Heart Rate: Invalid");
+    Serial.println("SpO2: Invalid");
+  }
+
+  if (dhtSensorOK) {
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println(" C");
+
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.println(" %");
+  } else {
+    Serial.println("Temperature: Invalid");
+  }
+
+  if (accelSensorOK) {
+    Serial.print("Tilt Angle: ");
+    Serial.print(tiltAngle);
+    Serial.println(" degrees");
+  } else {
+    Serial.println("Tilt Angle: Invalid");
+  }
+
+  Serial.print("Health Status: ");
+  Serial.println(
+    healthStatus == 0 ? "NORMAL" : "CHECK READING"
+  );
+
+  Serial.print("Sensor Quality Code: ");
+  Serial.println(sensorQuality);
+
+  Serial.println("====================================");
+
+  // Update the 16x2 LCD
+  updateLCD();
+}
+
+// ============== THINGSPEAK UPLOAD ==============
+void uploadToThingSpeak() {
+  if (WiFi.status() != WL_CONNECTED) {
+    networkStatus = 1;
+    Serial.println("Wi-Fi disconnected. Upload skipped.");
+    return;
+  }
+
+  networkStatus = 0;
+  sequenceNumber++;
+
+  HTTPClient http;
+
+  String url = "http://api.thingspeak.com/update?api_key=";
+  url += THINGSPEAK_API_KEY;
+
+  // Field 1: Heart Rate
+  url += "&field1=";
+  url += String(maxSensorOK ? heartRate : 0, 0);
+
+  // Field 2: SpO2
+  url += "&field2=";
+  url += String(maxSensorOK ? spo2 : 0, 0);
+
+  // Field 3: Temperature
+  url += "&field3=";
+  url += String(dhtSensorOK ? temperature : 0, 1);
+
+  // Field 4: Sequence Number
+  url += "&field4=";
+  url += String(sequenceNumber);
+
+  // Field 5: Health Status
+  url += "&field5=";
+  url += String(healthStatus);
+
+  // Field 6: Security Status
+  // HMAC and replay protection are not implemented.
+  url += "&field6=";
+  url += String(securityStatus);
+
+  // Field 7: Sensor Quality
+  url += "&field7=";
+  url += String(sensorQuality);
+
+  // Field 8: Network Status
+  url += "&field8=";
+  url += String(networkStatus);
+
+  http.begin(url);
+  http.setTimeout(10000);
+
+  int httpCode = http.GET();
+
+  if (httpCode > 0) {
+    String response = http.getString();
+
+    Serial.print("ThingSpeak HTTP code: ");
+    Serial.println(httpCode);
+
+    Serial.print("ThingSpeak response: ");
+    Serial.println(response);
+
+    if (response.toInt() > 0) {
+      Serial.println("Data uploaded successfully.");
+    } else {
+      Serial.println(
+        "Upload not accepted. Check API key or rate limit."
+      );
+    }
+  } else {
+    Serial.print("Upload failed: ");
+    Serial.println(http.errorToString(httpCode));
+  }
+
+  http.end();
+}
+
+// ============== SETUP ==============
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  // Initialize shared I2C bus
+  Wire.begin(21, 22);
+
+  // Initialize LCD
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Health Monitor");
+  lcd.setCursor(0, 1);
+  lcd.print("Starting...");
+
+  dht.begin();
+
+  Serial.println("\nESP32 Health Monitoring System");
+
+  // Initialize ADXL345
+  accelSensorOK = accel.begin();
+
+  if (accelSensorOK) {
+    accel.setRange(ADXL345_RANGE_16_G);
+    Serial.println("ADXL345 ready.");
+  } else {
+    Serial.println("ADXL345 not detected. Check wiring.");
+  }
+
+  // Initialize MAX30102
+  maxSensorOK = particleSensor.begin(Wire, I2C_SPEED_FAST);
+
+  if (maxSensorOK) {
+    particleSensor.setup(
+      60,    // LED brightness
+      4,     // Average samples
+      2,     // Red + IR LEDs
+      100,   // Sample rate
+      411,   // Pulse width
+      4096   // ADC range
+    );
+
+    particleSensor.setPulseAmplitudeRed(0x1F);
+    particleSensor.setPulseAmplitudeIR(0x1F);
+
+    Serial.println("MAX30102 ready.");
+  } else {
+    Serial.println("MAX30102 not detected. Check wiring.");
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.print("Connecting to Wi-Fi");
+
+  unsigned long wifiStart = millis();
+
+  while (
+    WiFi.status() != WL_CONNECTED &&
+    millis() - wifiStart < 15000
+  ) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Wi-Fi connected.");
+
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("Wi-Fi connection failed.");
+  }
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Sensors Ready");
+  lcd.setCursor(0, 1);
+  lcd.print("Starting...");
+  
+  delay(1500);
+
+  Serial.println("Setup complete.");
+}
+
+// ============== MAIN LOOP ==============
+void loop() {
+  unsigned long currentTime = millis();
+
+  // Read sensors approximately every 5 seconds
+  if (currentTime - lastSensorRead >= SENSOR_INTERVAL) {
+    lastSensorRead = currentTime;
+
+    readMAX30102();
+    readADXL345();
+    readDHT11();
+
+    updateHealthStatus();
+    updateSensorQuality();
+
+    printReadings();
+  }
+
+  // Upload to ThingSpeak every 20 seconds
+  if (currentTime - lastUpload >= UPLOAD_INTERVAL) {
+    lastUpload = currentTime;
+
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.reconnect();
+      Serial.println("Attempting Wi-Fi reconnection...");
+    }
+
+    uploadToThingSpeak();
+  }
+}
+```

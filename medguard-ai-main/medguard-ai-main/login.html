@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedGuard AI | Doctor Sign In</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-art">
+      <div class="brand"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></div>
+      <div class="art-copy">
+        <span class="eyebrow">SECURE PATIENT MONITORING</span>
+        <h1>Care connected.<br><em>Patients protected.</em></h1>
+        <p>One secure workspace for patient vitals, monitoring and access activity.</p>
+        <div class="mini-vitals">
+          <div><span class="pulse-dot"></span><small>Monitoring status</small><strong>Ready for demo</strong></div>
+          <div class="ecg">⌁⌁⌁⌁⌁⌁⌁</div>
+        </div>
+      </div>
+      <div class="art-footer">MEDGUARD AI <span>•</span> HACKATHON PROTOTYPE</div>
+    </section>
+    <section class="login-panel">
+      <div class="mobile-brand brand"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></div>
+      <div class="login-card">
+        <span class="eyebrow">DOCTOR PORTAL</span>
+        <h2>Welcome back</h2>
+        <p class="muted">Sign in to continue to your authorized workspace.</p>
+        {% if pending_message %}<div class="form-success">{{ pending_message }}</div>{% endif %}
+        <form id="login-form">
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" placeholder="Enter your username" required>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+          <div id="login-error" class="form-error" role="alert"></div>
+          <button class="primary-btn" type="submit">Sign in <span>→</span></button>
+        </form>
+        <div class="signup-prompt">New to MedGuard AI? <a href="/signup">Create an account</a></div>
+        <div class="demo-note"><span class="lock-icon">▣</span><div><b>Local demo accounts</b><br><small>Doctors: doctor1 / doctor2 — passwords in README. Admin: admin / Admin-MedGuard-Demo!</small><br><small>Demo credentials only. Change the admin password before sharing the demo.</small></div></div>
+        <p class="login-disclaimer">Prototype only · Use synthetic data for demonstrations</p>
+      </div>
+    </section>
+  </main>
+  <script>
+  document.getElementById('login-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorBox = document.getElementById('login-error');
+    errorBox.textContent = '';
+    const body = {
+      username: document.getElementById('username').value.trim(),
+      password: document.getElementById('password').value
+    };
+    try {
+      const response = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not sign in.');
+      window.location.href = '/';
+    } catch (error) { errorBox.textContent = error.message || 'Could not connect to server.'; }
+  });
+  </script>
+</body>
+</html>

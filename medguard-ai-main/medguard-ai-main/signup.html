@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedGuard AI | Create Account</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-art">
+      <div class="brand"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></div>
+      <div class="art-copy">
+        <span class="eyebrow">JOIN THE DOCTOR PORTAL</span>
+        <h1>Secure care starts<br><em>with your account.</em></h1>
+        <p>Create a demo doctor account. Your account stays pending until the administrator approves it. Patient records are restricted until a patient is assigned to you.</p>
+        <div class="mini-vitals"><div><span class="pulse-dot"></span><small>Access policy</small><strong>Assignment required</strong></div><div class="ecg">⌁⌁⌁⌁⌁⌁⌁</div></div>
+      </div>
+      <div class="art-footer">MEDGUARD AI <span>•</span> HACKATHON PROTOTYPE</div>
+    </section>
+    <section class="login-panel">
+      <div class="mobile-brand brand"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></div>
+      <div class="login-card">
+        <span class="eyebrow">DOCTOR REGISTRATION</span>
+        <h2>Create account</h2>
+        <p class="muted">Register to access the MedGuard AI portal.</p>
+        <form id="signup-form">
+          <label for="username">Username</label>
+          <input id="username" autocomplete="username" minlength="3" maxlength="40" placeholder="Choose a username" required>
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="new-password" minlength="12" placeholder="At least 12 characters" required>
+          <label for="confirm-password">Confirm password</label>
+          <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" placeholder="Enter password again" required>
+          <div id="signup-message" class="form-error" role="status"></div>
+          <button class="primary-btn" type="submit">Create account <span>→</span></button>
+        </form>
+        <div class="signup-prompt">Already registered? <a href="/">Sign in</a></div>
+        <div class="demo-note"><span class="lock-icon">▣</span><div><b>Patient access is restricted</b><br><small>Admin approval is required before sign-in. Patient assignments are granted separately.</small></div></div>
+        <p class="login-disclaimer">Prototype only · Do not enter real patient data</p>
+      </div>
+    </section>
+  </main>
+  <script>
+  document.getElementById('signup-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = document.getElementById('signup-message');
+    message.textContent = '';
+    const body = {
+      username: document.getElementById('username').value.trim(),
+      password: document.getElementById('password').value,
+      confirm_password: document.getElementById('confirm-password').value
+    };
+    try {
+      const response = await fetch('/signup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not create account.');
+      message.classList.remove('form-error');
+      message.classList.add('form-success');
+      message.textContent = data.message + ' Redirecting to sign in…';
+      setTimeout(() => window.location.href = '/', 1800);
+    } catch (error) {
+      message.classList.remove('form-success');
+      message.classList.add('form-error');
+      message.textContent = error.message || 'Could not connect to server.';
+    }
+  });
+  </script>
+</body>
+</html>

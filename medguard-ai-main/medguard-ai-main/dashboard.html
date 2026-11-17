@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedGuard AI | Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="app-body">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></a>
+    <div class="side-label">WORKSPACE</div>
+    <button class="nav-item active" data-view="overview"><span>▦</span> Overview</button>
+    <button class="nav-item" data-view="patients"><span>♧</span> My patients <span class="nav-count" id="patient-count">—</span></button>
+    <button class="nav-item" data-view="security"><span>⌁</span> Security activity</button>
+    <div class="sidebar-bottom">
+      <div class="connection"><span class="pulse-dot"></span><div><b>Demo environment</b><small>Local server</small></div></div>
+      <button id="logout-btn" class="logout-btn">↪ <span>Sign out</span></button>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <div><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><h1 id="page-title">Patient overview</h1></div>
+      <div class="profile"><div class="profile-avatar">DR</div><div><b id="doctor-name">Doctor</b><small>Assigned care team</small></div><span class="profile-chevron">⌄</span></div>
+    </header>
+    <section class="content">
+      <div class="welcome-row">
+        <div><span class="eyebrow">YOUR MONITORING SPACE</span><h2>Good to see you, Doctor.</h2><p class="muted">Review your assigned patients and the latest recorded vitals.</p></div>
+        <div class="last-updated"><span class="pulse-dot"></span> Demo data <span class="separator">·</span> <span id="updated-at">Loading…</span></div>
+      </div>
+      <div id="notice" class="notice hidden" role="status"></div>
+      <div class="stat-grid">
+        <article class="stat-card"><div class="stat-top"><span>Assigned patients</span><span class="stat-icon blue">♧</span></div><div class="stat-number" id="stat-patients">—</div><div class="stat-foot"><span class="tiny-dot blue-dot"></span> Only your assigned records</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Latest heart rate</span><span class="stat-icon coral">♡</span></div><div class="stat-number"><span id="stat-hr">—</span><small> BPM</small></div><div class="stat-foot"><span class="tiny-dot coral-dot"></span> Most recent sample</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Latest SpO₂</span><span class="stat-icon teal">◉</span></div><div class="stat-number"><span id="stat-spo2">—</span><small> %</small></div><div class="stat-foot"><span class="tiny-dot teal-dot"></span> Oxygen saturation sample</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Security status</span><span class="stat-icon violet">⌑</span></div><div class="stat-number status-number">Protected</div><div class="stat-foot"><span class="tiny-dot green-dot"></span> Server-side access checks</div></article>
+      </div>
+      <div class="section-grid">
+        <section class="panel patient-panel">
+          <div class="panel-heading"><div><h3>My patients</h3><p>Latest readings for patients assigned to your account.</p></div><button class="text-btn" data-view="patients">View all →</button></div>
+          <div class="table-wrap"><table><thead><tr><th>PATIENT</th><th>HEART RATE</th><th>SpO₂</th><th>TEMPERATURE</th><th></th></tr></thead><tbody id="patient-table"><tr><td colspan="5" class="empty-state">Loading assigned patients…</td></tr></tbody></table></div>
+          <div class="panel-foot"><span class="tiny-dot blue-dot"></span> Patient data is filtered by your server-side assignment</div>
+        </section>
+        <section class="panel signal-panel">
+          <div class="panel-heading"><div><h3>Monitoring preview</h3><p>Latest available demo sample</p></div><span class="live-pill"><i></i> DEMO</span></div>
+          <div class="chart-key"><span><i class="key-line hr-line"></i> Heart rate</span><span><i class="key-line spo-line"></i> SpO₂</span></div>
+          <div class="chart-area"><svg id="chart" viewBox="0 0 420 180" role="img" aria-label="Illustrative vital sign trend chart"><g class="chart-grid"><path d="M10 25H410 M10 65H410 M10 105H410 M10 145H410"/></g><path class="chart-line hr-chart" d="M10 110 L60 92 L110 100 L160 60 L210 76 L260 44 L310 65 L360 35 L410 48"/><path class="chart-line spo-chart" d="M10 137 L60 130 L110 135 L160 119 L210 126 L260 112 L310 118 L360 105 L410 110"/></svg></div>
+          <p class="chart-note"><span class="tiny-dot amber-dot"></span> Illustrative preview only — not live sensor data.</p>
+          <div class="integration-row thingspeak-row"><div class="integration-icon">TS</div><div class="integration-copy"><b>ThingSpeak live channel</b><small id="thingspeak-status">Checking server configuration…</small><small id="thingspeak-last-updated">No live reading loaded yet.</small></div><button id="thingspeak-refresh" class="open-btn" type="button">Refresh</button></div>
+          <div class="thingspeak-reading-grid"><div><span>Heart rate</span><b id="ts-hr">—</b><small>BPM · Field 1</small></div><div><span>SpO₂</span><b id="ts-spo2">—</b><small>% · Field 2</small></div><div><span>Temperature</span><b id="ts-temp">—</b><small>°C · Field 3</small></div></div>
+          <h4 class="field-status-heading">Device and security fields</h4>
+          <div class="thingspeak-status-grid">
+            <div><span>Sequence number · F4</span><b id="ts-sequence">Unknown</b></div>
+            <div><span>Health status · F5</span><b id="ts-health">Unknown</b></div>
+            <div><span>Reported security status · F6</span><b id="ts-security">Unknown</b></div>
+            <div><span>Sensor quality · F7</span><b id="ts-sensor">Unknown</b></div>
+            <div><span>Network status · F8</span><b id="ts-network">Unknown</b></div>
+          </div>
+          <p class="chart-note"><span class="tiny-dot amber-dot"></span> Status codes are reported by the device/test sender; they do not independently detect tampering or diagnose a condition.</p>
+        </section>
+      </div>
+      <section class="panel activity-panel">
+        <div class="panel-heading"><div><h3>Security activity</h3><p>Recent login and patient-record access events for this account.</p></div><button class="text-btn" data-view="security">View activity →</button></div>
+        <div id="activity-list" class="activity-list"><div class="empty-state">Loading activity…</div></div>
+      </section>
+      <footer class="app-footer"><span>MedGuard AI <b>•</b> Healthcare monitoring prototype</span><span>For demonstration only · Synthetic sample data</span></footer>
+    </section>
+  </main>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>

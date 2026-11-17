@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedGuard AI | Admin Panel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="app-body">
+  <aside class="sidebar">
+    <a class="brand" href="/admin"><span class="brand-mark">+</span><span>MedGuard <b>AI</b></span></a>
+    <div class="side-label">ADMIN WORKSPACE</div>
+    <div class="nav-item active"><span>⚙</span> Admin panel</div>
+    <div class="nav-item"><span>✓</span> Approvals & assignments</div>
+    <div class="sidebar-bottom">
+      <div class="connection"><span class="pulse-dot"></span><div><b>Admin mode</b><small>Local demo server</small></div></div>
+      <button id="logout-btn" class="logout-btn">↪ <span>Sign out</span></button>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <div><div class="breadcrumb">Workspace <span>/</span> <b>Admin</b></div><h1>Administration & access control</h1></div>
+      <div class="profile"><div class="profile-avatar">AD</div><div><b id="admin-name">Administrator</b><small>Demo admin account</small></div></div>
+    </header>
+    <section class="content admin-content">
+      <div class="welcome-row"><div><span class="eyebrow">ACCESS GOVERNANCE</span><h2>Manage doctor access.</h2><p class="muted">Approve accounts and assign patients. The server enforces these permissions.</p></div><div class="last-updated"><span class="pulse-dot"></span> Admin controls enabled</div></div>
+      <div id="admin-notice" class="notice hidden" role="status"></div>
+      <div class="stat-grid admin-stat-grid">
+        <article class="stat-card"><div class="stat-top"><span>Pending approvals</span><span class="stat-icon coral">!</span></div><div class="stat-number" id="pending-count">—</div><div class="stat-foot">Waiting for admin review</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Approved doctors</span><span class="stat-icon teal">✓</span></div><div class="stat-number" id="approved-count">—</div><div class="stat-foot">Can be assigned patients</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Demo patients</span><span class="stat-icon blue">♧</span></div><div class="stat-number" id="patient-count">—</div><div class="stat-foot">Synthetic records only</div></article>
+        <article class="stat-card"><div class="stat-top"><span>Assignments</span><span class="stat-icon violet">⌘</span></div><div class="stat-number" id="assignment-count">—</div><div class="stat-foot">Doctor–patient relationships</div></article>
+      </div>
+      <section class="panel admin-panel">
+        <div class="panel-heading"><div><h3>Doctor accounts</h3><p>New registrations start pending and cannot access patient data until approved.</p></div><button class="text-btn" id="refresh-btn">Refresh ↻</button></div>
+        <div class="table-wrap"><table><thead><tr><th>DOCTOR</th><th>STATUS</th><th>ASSIGNED PATIENTS</th><th>ACTION</th></tr></thead><tbody id="doctor-table"><tr><td colspan="4" class="empty-state">Loading accounts…</td></tr></tbody></table></div>
+      </section>
+      <div class="section-grid admin-lower-grid">
+        <section class="panel admin-panel">
+          <div class="panel-heading"><div><h3>Assign a patient</h3><p>Only approved doctor accounts are available in this list.</p></div></div>
+          <form id="assignment-form" class="admin-form">
+            <label for="assign-doctor">Approved doctor</label><select id="assign-doctor" required><option value="">Load doctors…</option></select>
+            <label for="assign-patient">Patient</label><select id="assign-patient" required><option value="">Load patients…</option></select>
+            <button class="primary-btn admin-primary" type="submit">Assign patient <span>→</span></button>
+          </form>
+        </section>
+        <section class="panel admin-panel">
+          <div class="panel-heading"><div><h3>Create demo patient</h3><p>Add a synthetic patient placeholder for assignment testing.</p></div></div>
+          <form id="patient-form" class="admin-form">
+            <label for="patient-name">Display name</label><input id="patient-name" maxlength="80" placeholder="e.g. Demo Patient C" required>
+            <button class="primary-btn admin-primary" type="submit">Create patient <span>→</span></button>
+          </form>
+          <div class="admin-inline-note">Do not enter real patient names or health information in this hackathon prototype.</div>
+        </section>
+      </div>
+      <section class="panel admin-panel activity-panel">
+        <div class="panel-heading"><div><h3>Recent audit events</h3><p>Approval, assignment, login, and access decisions.</p></div><button class="text-btn" id="audit-refresh-btn">Refresh ↻</button></div>
+        <div id="admin-audit-list" class="activity-list"><div class="empty-state">Loading audit events…</div></div>
+      </section>
+      <footer class="app-footer"><span>MedGuard AI <b>•</b> Admin prototype</span><span>Local demo only · Not for real patient data</span></footer>
+    </section>
+  </main>
+  <script src="/static/admin.js"></script>
+</body>
+</html>
